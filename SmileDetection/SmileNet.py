@@ -91,28 +91,18 @@ model.load_state_dict(torch.load("DeepSmile.pt"))
 
 
 while(True):
-    # Capture frame-by-frame
     (grabbed,frame) = camera.read()
-
-    # Our operations on the frame come here
     gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
     rects = detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
     for (fX, fY, fW, fH) in rects:
-    # extract the ROI of the face from the grayscale image,
-    # resize it to a fixed 28x28 pixels, and then prepare the
-    # ROI for classification via the CNN
-        roi = gray[fY:fY + fH, fX:fX + fW]
-        roi = cv2.cvtColor(roi,cv2.COLOR_GRAY2BGR)        
-        roi = cv2.resize(roi, (64, 64))        
-        label = model_test(model,roi)
+        face = gray[fY:fY + fH, fX:fX + fW]
+        face = cv2.cvtColor(face,cv2.COLOR_GRAY2BGR)        
+        face = cv2.resize(face, (64, 64))        
+        label = model_test(model,face)
         cv2.putText(frame, label, (fX, fY - 10),cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
         cv2.rectangle(frame,(fX,fY),(fX+fW,fY+fH),(0,255,0),3)
-
-    # Display the resulting frame
-    cv2.imshow('frame',frame)
+    cv2.imshow('LIVE...',frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
-# When everything done, release the capture
 camera.release()
 cv2.destroyAllWindows()
