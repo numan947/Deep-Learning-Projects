@@ -226,9 +226,11 @@ def get_fashion_mnist_labels(labels):
     return [text_labels[int(i)] for i in labels]
 
 def load_data_fashion_mnist(batch_size, resize=None):
-    tx = None
+    txs = []
     if resize:
-        tx = transforms.Compose([transforms.Resize(resize)])
+        txs.append(transforms.Resize(resize))
+    txs.append(transforms.ToTensor())
+    tx = transforms.Compose(txs)
     
     fashionTrain = torchvision.datasets.FashionMNIST("./data/FashionMnist", train=True, transform=tx, download=True)
     fashionTest = torchvision.datasets.FashionMNIST("./data/FashionMnist", train=False, transform=tx, download=True)
