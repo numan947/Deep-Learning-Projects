@@ -185,6 +185,38 @@ def train_ch3(net, train_iter, test_iter, criterion, num_epochs, batch_size, lr=
 
         print("Epoch {}, loss {}, train acc {}, evaluation acc {}".format(epoch+1, sum_loss/n, sum_acc/n, test_acc))
 
+#######################GPU TRY##########################
+
+
+def try_gpu(i=0):
+    if torch.cuda.is_available():
+        return torch.device("cuda:"+str(i))
+    return torch.device("cpu")
+
+def try_all_gpus():
+    if torch.cuda.is_available():
+        devices = []
+        for i in range(torch.cuda.device_count()):
+            device = torch.device('cuda:'+str(i))
+            devices.append(device)
+    else:
+        devices = [torch.device("cpu")]
+    return devices
+
+######################CNN####################
+def corr2d(X, K):
+    """X and K are Tensors"""
+    h,w = K.shape
+    Y = torch.zeros((X.shape[0]-h+1, X.shape[1]-w+1))
+
+    for i in range(Y.shape[0]):
+        for j in range(Y.shape[1]):
+            Y[i,j] = torch.sum(X[i:i+h, j:j+w]*K)
+    return Y
+
+
+
+
 
 
 ##################### FASHION_MNIST###############################
@@ -198,8 +230,8 @@ def load_data_fashion_mnist(batch_size, resize=None):
     if resize:
         tx = transforms.Compose([transforms.Resize(resize)])
     
-    fashionTrain = torchvision.datasets.FashionMNIST("./data/FashionMnist", train=True, transforms=tx, download=True)
-    fashionTest = torchvision.datasets.FashionMNIST("./data/FashionMnist", train=False, transforms=tx, download=True)
+    fashionTrain = torchvision.datasets.FashionMNIST("./data/FashionMnist", train=True, transform=tx, download=True)
+    fashionTest = torchvision.datasets.FashionMNIST("./data/FashionMnist", train=False, transform=tx, download=True)
 
     trainLoader = data.DataLoader(fashionTrain, num_workers=get_dataloader_workers(4), batch_size=batch_size, shuffle=True)
     testLoader = data.DataLoader(fashionTest, num_workers=get_dataloader_workers(4), batch_size=batch_size, shuffle=False)
