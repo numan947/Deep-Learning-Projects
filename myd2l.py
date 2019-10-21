@@ -276,15 +276,13 @@ def load_data_fashion_mnist(batch_size, resize=None):
 
 
 
-def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, cutoff=None, verbose=True):
+def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, cutoff=None, verbose=True, printBatch=False):
     model = model.to(device)
     optimizer = optim.SGD(model.parameters(), lr = lr, weight_decay=0.005)
     trainLosses, testLosses = [],[]
     trainAccs, testAccs = [],[]
     
     for e in range(num_epochs):
-        if not verbose:
-            sys.stdout.write("\r"+str(e+1))
         currentBatch = 0
         curt = time.time()
         model.train()
@@ -308,8 +306,9 @@ def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, c
             nTrain+=X.shape[0]
             totalTrainCorrect += (torch.argmax(y_hat, dim=1) == y).sum()
 
-            if(nTrain%1024==0 and nTrain!=0 and verbose):
-                sys.stdout.write("\r"+str(nTrain)) 
+
+            if(printBatch or verbose):
+                sys.stdout.write("\r Epoch{}".format(e+1)+" "+str(currentBatch)+" / "+str(len(train_iter))) 
             if cutoff is not None and currentBatch>=cutoff:
                 break               
 
@@ -355,12 +354,8 @@ def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, c
             
                 print("Average TestLoss {0:.3f}".format(averageTestLoss))
                 print("Testset Accuracy {0:.3f}".format(averageTestAccuracy))
-                print("Time Needed: ", datetime.timedelta(seconds=time.time()-curt))
-
-    if not verbose:
-        sys.stdout.write("\r")
+                print("Time Needed: ", datetime.timedelta(time.time() - curt))
     return trainLosses, trainAccs, testLosses, testAccs
-
 
 def weight_reset(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
@@ -380,7 +375,7 @@ def generate_lr_report(train_function, net, criterion, train_iter, test_iter, nu
     for lr,ax in zip(lrs,axes):
         net.apply(weight_reset)
         curTime = time.time()
-        trl,tra,tsl,tsa = train_function(net, criterion, train_iter, test_iter, num_epochs, lr, device, cutoff=cutoff, verbose=False)
+        trl,tra,tsl,tsa = train_function(net, criterion, train_iter, test_iter, num_epochs, lr, device, cutoff=cutoff, verbose=False,printBatch=True)
         print("Learning rate: ", lr)
         print("Train Losses: ", trl)
         print("Test Losses : ", tsl)
