@@ -10,9 +10,9 @@ import torch.utils.data as data
 
 import torchvision
 from torchvision.transforms import transforms
-
-
-
+import torch.optim as optim
+import torch.nn as nn
+import datetime
 
 
 def use_svg_display():
@@ -272,3 +272,112 @@ def load_data_fashion_mnist(batch_size, resize=None):
 
     return (trainLoader, testLoader)
 
+########################## My Trainers#############################################
+
+
+
+def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, cutoff=None, verbose=True):
+    model = model.to(device)
+    optimizer = optim.SGD(model.parameters(), lr = lr, weight_decay=0.005)
+    trainLosses, testLosses = [],[]
+    trainAccs, testAccs = [],[]
+    
+    for e in range(num_epochs):
+        if not verbose:
+            sys.stdout.write("\r"+str(e+1))
+        currentBatch = 0
+        curt = time.time()
+        model.train()
+        
+        totalTrainLoss = torch.tensor(0.0, device=device)
+        nTrain = torch.tensor(0.0, device=device)
+        totalTrainCorrect = torch.tensor(0.0, device=device)
+
+        for X, y in train_iter:
+            currentBatch+=1
+
+            optimizer.zero_grad()
+            
+            X,y = X.to(device), y.to(device)
+            y_hat = model(X)
+
+            loss = criterion(y_hat, y)
+            loss.backward()
+            optimizer.step()
+            totalTrainLoss+= loss*X.shape[0]
+            nTrain+=X.shape[0]
+            totalTrainCorrect += (torch.argmax(y_hat, dim=1) == y).sum()
+
+            if(nTrain%1024==0 and nTrain!=0 and verbose):
+                sys.stdout.write("\r"+str(nTrain)) 
+            if cutoff is not None and currentBatch>=cutoff:
+                break               
+
+        with torch.no_grad():
+            
+            averageTrainLoss = (1.0*totalTrainLoss/nTrain).item()
+            averageAccuracy = (1.0*totalTrainCorrect/nTrain).item() 
+            
+            trainLosses.append(averageTrainLoss)
+            trainAccs.append(averageAccuracy)
+
+
+            model.eval()
+            # totalTestLoss = 0.0
+            # nTest = 0
+            # totalTestCorrect = 0
+            totalTestLoss = torch.tensor(0.0, device=device)
+            nTest = torch.tensor(0.0, device=device)
+            totalTestCorrect = torch.tensor(0.0, device=device)
+
+            for X,y in test_iter:
+                
+                X,y = X.to(device), y.to(device)
+                y_hat = model(X)
+                loss = criterion(y_hat, y)
+                totalTestLoss+=X.shape[0]*loss
+                nTest+=X.shape[0]
+                totalTestCorrect+=(torch.argmax(y_hat, dim=1)==y).sum()
+                if cutoff is not None and currentBatch>=cutoff:
+                    break       
+            
+
+            averageTestLoss = (1.0*totalTestLoss/nTest).item()
+            averageTestAccuracy = (1.0*totalTestCorrect/nTest).item()
+            
+            testLosses.append(averageTestLoss)
+            testAccs.append(averageTestAccuracy)
+            
+            if verbose:
+                print("Epoch ", e+1)
+                print("Average TrainLoss {0:.3f}".format(averageTrainLoss))
+                print("Training Accuracy {0:.3f}".format(averageAccuracy))
+            
+                print("Average TestLoss {0:.3f}".format(averageTestLoss))
+                print("Testset Accuracy {0:.3f}".format(averageTestAccuracy))
+                print("Time Needed: ", datetime.timedelta(seconds=time.time()-curt))
+
+    if not verbose:
+        sys.stdout.write("\r")
+    return trainLosses, trainAccs, testLosses, testAccs
+
+
+def weight_reset(m):
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        m.reset_parameters()
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
+
+
+def generate_lr_report(train_function, net, criterion, train_iter, valid_iter, num_epochs, device, lrs, cutoff=5):
+    for lr in lrs:
+        net.apply(weight_reset)
+        curTime = time.time()
+        trl,tra,tsl,tsa = train_function(net, criterion, train_iter, valid_iter, num_epochs, lr, device, cutoff=cutoff, verbose=False)
+        print("Learning rate: ", lr)
+        print("Train Losses: ", trl)
+        print("Test Losses : ", tsl)
+        print("Train Accuracies: ", tra)
+        print("Test Accuracies : ", tsa)
+        print("Time Needed: ", datetime.timedelta(seconds=time.time()-curTime))
