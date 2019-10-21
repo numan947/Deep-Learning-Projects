@@ -370,14 +370,27 @@ def weight_reset(m):
         m.bias.data.fill_(0.01)
 
 
-def generate_lr_report(train_function, net, criterion, train_iter, valid_iter, num_epochs, device, lrs, cutoff=5):
-    for lr in lrs:
+# import datetime
+def generate_lr_report(train_function, net, criterion, train_iter, test_iter, num_epochs, device, lrs, cutoff=5):
+    # print(int(np.ceil(len(lrs)/4.0)), int(np.floor(len(lrs)/4.0)))
+    _, axes = plt.subplots(nrows=int(np.ceil(len(lrs)/4.0)), ncols=4, figsize=(12,8))
+    axes = axes.flatten()
+    axes = axes[:len(lrs)]
+
+    for lr,ax in zip(lrs,axes):
         net.apply(weight_reset)
         curTime = time.time()
-        trl,tra,tsl,tsa = train_function(net, criterion, train_iter, valid_iter, num_epochs, lr, device, cutoff=cutoff, verbose=False)
+        trl,tra,tsl,tsa = train_function(net, criterion, train_iter, test_iter, num_epochs, lr, device, cutoff=cutoff, verbose=False)
         print("Learning rate: ", lr)
         print("Train Losses: ", trl)
         print("Test Losses : ", tsl)
         print("Train Accuracies: ", tra)
         print("Test Accuracies : ", tsa)
         print("Time Needed: ", datetime.timedelta(seconds=time.time()-curTime))
+        ax.plot(tra, label="train acc")
+        ax.plot(tsa, label="test acc")
+        ax.plot(trl, label="train loss")
+        ax.plot(tsl, label="test loss")
+        ax.title.set_text("Learning Rate: "+str(lr))
+        ax.legend()
+    return axes
