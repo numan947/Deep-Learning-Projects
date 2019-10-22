@@ -354,7 +354,7 @@ def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, c
             
                 print("Average TestLoss {0:.3f}".format(averageTestLoss))
                 print("Testset Accuracy {0:.3f}".format(averageTestAccuracy))
-                print("Time Needed: ", datetime.timedelta(time.time() - curt))
+                print("Time Needed: ", datetime.timedelta(seconds=(time.time() - curt)))
     return trainLosses, trainAccs, testLosses, testAccs
 
 def weight_reset(m):
