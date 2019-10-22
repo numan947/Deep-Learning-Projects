@@ -29,8 +29,7 @@ class NetworkInNetwork(nn.Module):
             nn.MaxPool2d(3,2),
             nn.Dropout(0.5),
             nin_block(384, 10, 3, 1, 1),
-            nn.AdaptiveAvgPool2d((28,28)),
-            nn.AvgPool2d(28)
+            nn.AdaptiveAvgPool2d((1,1)),
         )
     def forward(self, x):
         x = self.classifier(x)
