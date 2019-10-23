@@ -387,3 +387,69 @@ def generate_lr_report(train_function, net, criterion, train_iter, test_iter, nu
         ax.title.set_text("Learning Rate: "+str(lr))
         ax.legend()
     return axes
+
+
+    ####################TEXT PROCESSING#########################
+
+def read_time_machine():
+    """Load Time Machine book into a list of sentences"""
+    with open("./timemachine.txt", "r") as f:
+        lines = f.readlines()
+    
+    return [re.sub("[^A-Za-z]+",' ', line.strip().lower()) for line in lines]
+
+def tokenize(lines, token="word"):
+    if token == "word":
+        return [line.split(' ') for line in lines]
+    elif token == "char":
+        return [list(line) for line in lines]
+    else:
+        print("Unknown Token Type")
+
+
+def count_corpus(sentences):
+    tokens = [toks for line in sentences for toks in line]
+    return collections.Counter(tokens)
+
+class Vocab(object):
+    def __init__(self, tokens, min_freq=0, use_special_tokens=False):
+        counter = count_corpus(tokens)
+        self.token_freqs = sorted(counter.items(), key=lambda x : x[0])
+        self.token_freqs.sort(key=lambda x:x[1], reverse=True)
+
+        if use_special_tokens:
+            self.pad, self.bos, self.eos, self.unk = (0, 1, 2, 3)
+            uniq_tokens = ['<pad>','<bos>','<eos>','<unk>']
+        
+        else:
+            self.unk, uniq_tokens = 0, ['<unk>']
+        
+        uniq_tokens.extend([token for token, freq in self.token_freqs if freq>=min_freq and token not in uniq_tokens])
+
+        self.idx_to_token, self.token_to_idx = [], dict()
+
+        for token in uniq_tokens:
+            self.idx_to_token.append(token)
+            self.token_to_idx[token] = len(self.idx_to_token)-1
+    
+    def __len__(self):
+        return len(self.idx_to_token)
+
+    def __getitem__(self, tokens):
+        if not isinstance(tokens, (list, tuple)):
+            return self.token_to_idx.get(tokens, self.unk)
+        return [self.__getitem__(token) for token in tokens]
+    
+    def to_token(self, indices):
+        if not isinstance(indices, (list, tuple)):
+            return self.idx_to_token[indices]
+        return [self.idx_to_token[index] for index in indices]
+
+def load_corpus_time_machine(max_tokens=-1):
+    lines = read_time_machine()
+    tokens = tokenize(lines, 'char')
+    vocab = Vocab(tokens)
+    corpus = [vocab[tk] for line in tokens for tk in lines]
+    if max_tokens>0: 
+        corpus = corpus[:max_tokens]
+    return corpus, vocab
