@@ -453,3 +453,58 @@ def load_corpus_time_machine(max_tokens=-1):
     if max_tokens>0: 
         corpus = corpus[:max_tokens]
     return corpus, vocab
+
+
+def seq_data_iter_random(corpus, batch_size, num_steps):
+    """Each sequence in the batches starts at random"""
+    corpus = corpus[random.randint(0, num_steps):]
+    num_examples = ((len(corpus)-1)//num_steps)
+    example_indices = list(range(0, num_examples*num_steps, num_steps))
+    random.shuffle(example_indices)
+    data = lambda pos: corpus[pos:pos+num_steps] ## Function, given index j, returns jth slice
+    
+    num_batches = num_examples//batch_size
+
+    for i in range(0, batch_size*num_batches, batch_size):
+        batch_indices = example_indices[i:i+batch_size]
+        X = [data(j) for j in batch_indices]
+        Y = [data(j+1) for j in batch_indices]
+
+        yield torch.tensor(X), torch.tensor(Y)
+
+
+def seq_data_iter_consecutive(corpus, batch_size, num_steps):
+    """Each sequence in the batch follows after the sequence in the previous batch"""
+    offset = random.randint(0, num_steps)
+    num_indices = ((len(corpus) - offset - 1)//batch_size) * batch_size
+
+    Xs = torch.tensor(corpus[offset:offset+num_indices])
+    Ys = torch.tensor(corpus[offset+1: offset+1+num_indices])
+    
+    Xs, Ys = Xs.view((batch_size, -1)), Ys.view((batch_size, -1))
+    # print(Xs)
+    # print(Ys)
+    num_batches = Xs.shape[1]//num_steps
+    for i in range(0, num_batches*num_steps, num_steps):
+        X = Xs[:, i:(i+num_steps)]
+        Y = Ys[:, i:(i+num_steps)]
+        yield X, Y
+
+class SeqDataLoader(object):
+    """Sequence Loader Object"""
+    def __init__(self, corpus, vocab, batch_size, num_steps, use_random_iter, max_tokens):
+        if use_random_iter:
+            data_iter_fn = seq_data_iter_random
+        else:
+            data_iter_fn = seq_data_iter_consecutive
+        
+        self.corpus, self.vocab = corpus, vocab
+        self.get_iter = lambda: data_iter_fn(self.corpus, batch_size, num_steps)
+
+    def __iter__(self):
+        return self.get_iter()
+
+
+def load_data_time_machine(batch_size, num_steps, use_random_iter=False, max_tokens=1000):
+    data_iter = SeqDataLoader(*(load_corpus_time_machine()), batch_size, num_steps, use_random_iter, max_tokens)
+    return data_iter, data_iter.vocab
