@@ -545,7 +545,7 @@ def train_recurrent_model(model, criterion, optimizer, vocab, train_iter,  batch
     perplexities = []
 
     for e in range(num_epochs):
-        h = model.init_hidden(batch_size,device).float()
+        h = model.init_hidden(batch_size,device)
         total_loss = 0
         total_examples = 0
         for X, y in train_iter:            
@@ -553,9 +553,11 @@ def train_recurrent_model(model, criterion, optimizer, vocab, train_iter,  batch
                 X,y = torch.nn.functional.one_hot(X, len(vocab)).to(device).float(),y.to(device).flatten().float()
             else:
                 X,y = torch.nn.functional.one_hot(X.T, len(vocab)).to(device).float(),y.T.reshape(-1,).to(device).float()
-            
-            h.detach_()
-            
+
+            if model.recurrent_type=="lstm":
+                h = tuple(h.detach() for h in h)
+            else:
+                h = h.detach()
             optimizer.zero_grad()
 
             out,h = model(X, h)
