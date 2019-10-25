@@ -519,3 +519,59 @@ def grad_clipping(params, theta, ctx):
         for param in params:
             param.grad.data.mul_(theta / norm)
 
+
+def generate(prefix, num_predicts, model, vocab, device):
+    state = model.init_hidden(batch_size=1, device=device).float()
+    model = model.to(device)
+    outputs = [vocab[prefix[0]]]
+
+    get_input = lambda: F.one_hot(torch.tensor(outputs[-1], device=device).view(1,1), len(vocab)).float()
+
+    for y in prefix[1:]:
+        # print(state.shape)
+        _, state = model(get_input(), state)
+        outputs.append(vocab[y])
+    
+    for _ in range(num_predicts):
+        Y, state = model(get_input(), state)
+        outputs.append(int(Y.argmax(dim=1).item()))
+    # print(outputs)
+    return ''.join([vocab.idx_to_token[i] for i in outputs])
+
+def train_recurrent_model(model, criterion, optimizer, vocab, train_iter,  batch_size, num_epochs, device, clip_val=5.0, batch_first=True):
+    
+    model = model.to(device)
+    train_losses = []
+    perplexities = []
+
+    for e in range(num_epochs):
+        h = model.init_hidden(batch_size,device).float()
+        total_loss = 0
+        total_examples = 0
+        for X, y in train_iter:            
+            if batch_first:
+                X,y = torch.nn.functional.one_hot(X, len(vocab)).to(device).float(),y.to(device).flatten().float()
+            else:
+                X,y = torch.nn.functional.one_hot(X.T, len(vocab)).to(device).float(),y.T.reshape(-1,).to(device).float()
+            
+            h.detach_()
+            
+            optimizer.zero_grad()
+
+            out,h = model(X, h)
+
+            loss = criterion(out, y.long())
+
+            loss.backward()
+            
+            nn.utils.clip_grad_norm_(model.parameters(),clip_val)
+
+            optimizer.step()
+            total_loss+= loss.item()*X.shape[0]
+            total_examples+=X.shape[0]
+        
+        perplexities.append(np.exp(total_loss/total_examples))
+        train_losses.append(total_loss/total_examples)
+        print("Epoch {}  Loss {} perplexity {}".format(e, train_losses[-1], perplexities[-1]))
+    
+    return train_losses, perplexities
