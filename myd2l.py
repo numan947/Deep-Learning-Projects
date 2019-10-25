@@ -449,7 +449,7 @@ def load_corpus_time_machine(max_tokens=-1):
     lines = read_time_machine()
     tokens = tokenize(lines, 'char')
     vocab = Vocab(tokens)
-    corpus = [vocab[tk] for line in tokens for tk in lines]
+    corpus = [vocab[tk] for line in tokens for tk in line]
     if max_tokens>0: 
         corpus = corpus[:max_tokens]
     return corpus, vocab
@@ -506,5 +506,16 @@ class SeqDataLoader(object):
 
 
 def load_data_time_machine(batch_size, num_steps, use_random_iter=False, max_tokens=1000):
-    data_iter = SeqDataLoader(*(load_corpus_time_machine()), batch_size, num_steps, use_random_iter, max_tokens)
+    data_iter = SeqDataLoader(*(load_corpus_time_machine()), batch_size, 
+                                num_steps, use_random_iter, max_tokens)
     return data_iter, data_iter.vocab
+
+def grad_clipping(params, theta, ctx):
+    norm = torch.Tensor([0], device=ctx)
+    for param in params:
+        norm += (param.grad ** 2).sum()
+    norm = norm.sqrt().item()
+    if norm > theta:
+        for param in params:
+            param.grad.data.mul_(theta / norm)
+
