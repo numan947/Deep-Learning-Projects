@@ -640,3 +640,35 @@ def load_data_nmt(filename, batch_size, num_steps, num_examples=1000):
     return src_vocab, tgt_vocab, data_iter
 
 
+
+
+class Encoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(Encoder, self).__init__(**kwargs)
+    
+    def forward(self, X):
+        raise NotImplementedError
+
+
+class Decoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(Decoder, self).__init__(**kwargs)
+    
+    def forward(self,X, state):
+        raise NotImplementedError
+    
+    def init_state(self, enc_outputs, *args):
+        raise NotImplementedError
+    
+class EncoderDecoder(nn.Module):
+    def __init__(self, encoder, decoder, **kwargs):
+        super(EncoderDecoder, self).__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
+    
+    def forward(self, enc_X, dec_X, *args):
+
+        enc_outputs = self.encoder(enc_X, *args)
+        dec_state = self.decoder.init_state(enc_outputs, *args)
+
+        return self.decoder(dec_X, dec_state)
