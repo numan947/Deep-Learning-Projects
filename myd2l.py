@@ -577,3 +577,66 @@ def train_recurrent_model(model, criterion, optimizer, vocab, train_iter,  batch
         print("Epoch {}  Loss {} perplexity {}".format(e, train_losses[-1], perplexities[-1]))
     
     return train_losses, perplexities
+
+
+
+########################Neural Machine Translation####################################
+def read_data_nmt(name):
+    with open(name, 'r') as f:
+        return f.read()
+
+def preprocess_nmt(text):
+    text = text.replace("\u202f"," ").replace("\xa0"," ")
+
+    space_needed = lambda char, prev_char: True if char in (',','!','?','.') and prev_char !=' ' else False
+    out = [" "+char if i>0 and space_needed(char, text[i-1]) else char for i, char in enumerate(text.lower())]
+
+    return ''.join(out) 
+
+def tokenize_nmt(text, num_examples=None):
+    source, target = [], []
+
+    for i, line in enumerate(text.split("\n")):
+        if num_examples and i > num_examples:
+            break
+        parts = line.split("\t")
+
+        if(len(parts)==2):
+            source.append(parts[0].split(" "))
+            target.append(parts[1].split(" "))
+    return source, target
+
+def trim_pad(line, num_steps, padding_token):
+    if len(line)>num_steps:
+        return line[:num_steps]
+    return line+[padding_token]*(num_steps-len(line))
+
+
+def build_array(lines, vocab, num_steps, is_source):
+    lines = [vocab[l] for l in lines]
+
+    if not is_source:
+        lines = [[vocab.bos]+l+[vocab.eos] for l in lines]
+    
+    array = torch.tensor([trim_pad(l, num_steps, vocab.pad) for l in lines])
+    valid_len = (array!=vocab.pad).sum(dim=1)
+
+    return array, valid_len
+
+def load_data_nmt(filename, batch_size, num_steps, num_examples=1000):
+    text = preprocess_nmt(read_data_nmt(filename))
+    source, target = tokenize_nmt(text, num_examples)
+    
+    src_vocab = Vocab(source, min_freq=2, use_special_tokens=True)
+    tgt_vocab = Vocab(target, min_freq=2, use_special_tokens=True)
+
+    source_array, source_valid_len = build_array(source, src_vocab, num_steps, is_source=True)
+    target_array, target_valid_len = build_array(target, tgt_vocab, num_steps, is_source=False)
+
+    data_arrays = (source_array, source_valid_len, target_array, target_valid_len)
+
+    data_iter = load_array(data_arrays, batch_size)
+
+    return src_vocab, tgt_vocab, data_iter
+
+
