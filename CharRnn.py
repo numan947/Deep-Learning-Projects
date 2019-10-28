@@ -42,7 +42,7 @@ class RNNModel(nn.Module):
                 batch_first=batch_first,
                 bidirectional=bidirectional
                 )
-        ##TODO: add others here
+
         if self.bidirectional:
             self.dense = nn.Linear(2*self.hidden_size, self.output_size)
         else:

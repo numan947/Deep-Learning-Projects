@@ -744,3 +744,62 @@ class MLPAttention(nn.Module):
         attention_weights = self.dropout(masked_softmax(scores, valid_length))
 
         return torch.bmm(attention_weights, value)
+
+
+def train_encoder_decoder_model(model, data_iter, criterion, optimizer, num_epochs, device):
+    model = model.to(device)
+    model = model.apply(weight_reset)
+
+    animator = Animator(xlabel="epoch", ylabel="loss", xlim=[1, num_epochs])
+
+    for e in range(1, num_epochs+1):
+        timer = Timer()
+        metric = Accumulator(2)
+        # sys.stdout.write("\rRunning, {}".format(e))
+
+        for X, X_vlen, Y, Y_vlen in data_iter:
+            X, X_vlen, Y, Y_vlen = X.to(device), X_vlen.to(device), Y.to(device), Y_vlen.to(device)
+            Y_input, Y_label, Y_vlen = Y[:,:-1], Y[:, 1:], Y_vlen-1
+
+            optimizer.zero_grad()
+
+            Y_hat, state = model(X, Y_input)
+            loss = criterion(Y_hat, Y_label, Y_vlen).sum()
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+            optimizer.step()
+
+            num_tokens = Y_vlen.sum().item()
+            metric.add(loss.item(), num_tokens)
+        if e%10==0:
+            animator.add(e, metric[0]/metric[1])
+    print("loss {}, {} tokens/sec in {}".format(metric[0]/metric[1], metric[1]/timer.stop(), device))
+
+
+def predict_seq2seq(model, src_sentence, src_vocab, tgt_vocab, num_steps, device):
+    """Input one sentece at a time"""
+    model = model.to(device)
+    src_tokens = src_vocab[src_sentence.lower().split(" ")]
+    enc_valid_length = torch.tensor([len(src_tokens)], device=device, dtype=torch.float32)
+    src_tokens = trim_pad(src_tokens, num_steps, src_vocab.pad)
+
+    enc_X = torch.tensor(src_tokens, device=device).float()
+
+    enc_outputs = model.encoder(enc_X.unsqueeze(dim=0))
+    dec_state = model.decoder.init_state(enc_outputs)
+    dec_X = torch.tensor([tgt_vocab.bos], device=device, dtype=torch.float32).unsqueeze(dim=0)
+
+    predicted_tokens = []
+
+    for _ in range(num_steps):
+        Y, dec_state = model.decoder(dec_X, dec_state)
+        dec_X = torch.argmax(Y, dim=2)
+
+        py = dec_X.squeeze(dim=0).int().item()
+
+        if py == tgt_vocab.eos:
+            break
+        predicted_tokens.append(py)
+    
+    return ' '.join(tgt_vocab.to_token(predicted_tokens))
