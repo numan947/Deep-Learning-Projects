@@ -701,3 +701,46 @@ class MaskedCrossEntropyLoss(nn.CrossEntropyLoss):
 
         output = super(MaskedCrossEntropyLoss, self).forward(preds.reshape(-1,preds.shape[-1]), labels.flatten())
         return (output.view(weights.shape)*weights).mean(dim=1)
+
+
+## X: a 3D tensor, valid_length: 2D or 1D tensor --> batchwise or individual
+def masked_softmax(X, valid_length=None):
+    softmax = nn.Softmax(dim=1)
+    if valid_length is None:
+        return softmax(X)
+    else:
+        shape = X.shape
+        if valid_length.ndim == 1:
+            valid_length = torch.FloatTensor(valid_length.numpy().repeat(shape[1], axis=0))
+        else:
+            valid_length = valid_length.flatten()
+        X = SequenceMask(X.view((-1, shape[-1])), valid_length, value=-1e6) # large negative numbers' exp is zero, that is why value=-1e6
+
+        return softmax(X).reshape(shape)
+
+class MLPAttention(nn.Module):
+    ## key_dim is the dimensions of individual keys and values
+    def __init__(self, key_dim, hidden_units, dropout):
+        super(MLPAttention, self).__init__()
+
+        self.W_k = nn.Linear(key_dim, hidden_units, bias=False)
+        self.W_q = nn.Linear(key_dim, hidden_units, bias=False)
+        self.v = nn.Linear(hidden_units, 1, bias=False)
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, query, key, value, valid_length=None):
+        query, key = torch.tanh(self.W_q(query)), torch.tanh(self.W_k(key))
+        features = query.unsqueeze(dim=2)+key.unsqueeze(1)
+        # print("\nQUERY")
+        # print(query.unsqueeze(dim=2))
+        # print("\nKEY")
+        # print(key.unsqueeze(1))
+        # print("\n\nQUERY+KEY")
+        # print(features)
+        # print(query.shape, key.shape)
+        # print(query.unsqueeze(dim=2).shape, key.unsqueeze(1).shape)
+        # print(features.shape)
+        scores = self.v(features).squeeze(-1) # the last dimension have 1 single dimension, remove it
+        attention_weights = self.dropout(masked_softmax(scores, valid_length))
+
+        return torch.bmm(attention_weights, value)
