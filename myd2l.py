@@ -672,3 +672,32 @@ class EncoderDecoder(nn.Module):
         dec_state = self.decoder.init_state(enc_outputs, *args)
 
         return self.decoder(dec_X, dec_state)
+
+
+
+
+def SequenceMask(X, X_len, value=0):
+    all_masks = []
+
+    for sen,vlen in zip(X,X_len):
+        tmp_m = []
+        # print(sen,vlen)
+        for i in range(len(sen)):
+            if(i<vlen):
+                tmp_m.append(True)
+            else:
+                tmp_m.append(False)
+        all_masks.append(tmp_m)
+    
+    X[~(torch.tensor(all_masks))] = value
+    return X
+
+
+class MaskedCrossEntropyLoss(nn.CrossEntropyLoss):
+    def forward(self, preds, labels, valid_length):
+        weights = torch.ones_like(labels)
+        weights = SequenceMask(weights, valid_length).float()
+        self.reduction="none"
+
+        output = super(MaskedCrossEntropyLoss, self).forward(preds.reshape(-1,preds.shape[-1]), labels.flatten())
+        return (output.view(weights.shape)*weights).mean(dim=1)
