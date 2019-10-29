@@ -359,8 +359,7 @@ def train_sgd(model, criterion, train_iter, test_iter, num_epochs, lr, device, c
 
 def weight_reset(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-        if m.weight:
-            torch.nn.init.xavier_uniform_(m.weight)
+        torch.nn.init.xavier_uniform_(m.weight)
         if m.bias:
             m.bias.data.fill_(0.01)
 
