@@ -764,7 +764,7 @@ def train_encoder_decoder_model(model, data_iter, criterion, optimizer, num_epoc
 
             optimizer.zero_grad()
 
-            Y_hat, state = model(X, Y_input)
+            Y_hat, state = model(X, Y_input, X_vlen, Y_vlen)
             loss = criterion(Y_hat, Y_label, Y_vlen).sum()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
