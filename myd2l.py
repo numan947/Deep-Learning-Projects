@@ -710,6 +710,9 @@ def masked_softmax(X, valid_length=None):
     if valid_length is None:
         return softmax(X)
     else:
+        device = X.device
+        X = X.cpu()
+        valid_length = valid_length.cpu()
         shape = X.shape
         if valid_length.ndim == 1:
             valid_length = torch.FloatTensor(valid_length.numpy().repeat(shape[1], axis=0))
@@ -717,7 +720,7 @@ def masked_softmax(X, valid_length=None):
             valid_length = valid_length.flatten()
         X = SequenceMask(X.view((-1, shape[-1])), valid_length, value=-1e6) # large negative numbers' exp is zero, that is why value=-1e6
 
-        return softmax(X).reshape(shape)
+        return softmax(X).reshape(shape).to(device)
 
 class MLPAttention(nn.Module):
     ## key_dim is the dimensions of individual keys and values
