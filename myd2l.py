@@ -731,20 +731,11 @@ class MLPAttention(nn.Module):
         self.W_q = nn.Linear(key_dim, hidden_units, bias=False)
         self.v = nn.Linear(hidden_units, 1, bias=False)
         self.dropout = nn.Dropout(dropout)
-    
+
     def forward(self, query, key, value, valid_length=None):
         query, key = torch.tanh(self.W_q(query)), torch.tanh(self.W_k(key))
         features = query.unsqueeze(dim=2)+key.unsqueeze(1)
-        # print("\nQUERY")
-        # print(query.unsqueeze(dim=2))
-        # print("\nKEY")
-        # print(key.unsqueeze(1))
-        # print("\n\nQUERY+KEY")
-        # print(features)
-        # print(query.shape, key.shape)
-        # print(query.unsqueeze(dim=2).shape, key.unsqueeze(1).shape)
-        # print(features.shape)
-        scores = self.v(features).squeeze(-1) # the last dimension have 1 single dimension, remove it
+        scores = self.v(features).squeeze(-1)
         attention_weights = self.dropout(masked_softmax(scores, valid_length))
 
         return torch.bmm(attention_weights, value)
@@ -780,7 +771,6 @@ def train_encoder_decoder_model(model, data_iter, criterion, optimizer, num_epoc
             animator.add(e, metric[0]/metric[1])
     print("loss {}, {} tokens/sec in {}".format(metric[0]/metric[1], metric[1]/timer.stop(), device))
 
-
 def predict_seq2seq(model, src_sentence, src_vocab, tgt_vocab, num_steps, device):
     """Input one sentece at a time"""
     model = model.to(device)
@@ -790,8 +780,8 @@ def predict_seq2seq(model, src_sentence, src_vocab, tgt_vocab, num_steps, device
 
     enc_X = torch.tensor(src_tokens, device=device).float()
 
-    enc_outputs = model.encoder(enc_X.unsqueeze(dim=0))
-    dec_state = model.decoder.init_state(enc_outputs)
+    enc_outputs = model.encoder(enc_X.unsqueeze(dim=0), enc_valid_length)
+    dec_state = model.decoder.init_state(enc_outputs, enc_valid_length)
     dec_X = torch.tensor([tgt_vocab.bos], device=device, dtype=torch.float32).unsqueeze(dim=0)
 
     predicted_tokens = []
