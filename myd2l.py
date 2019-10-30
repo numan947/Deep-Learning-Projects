@@ -13,6 +13,7 @@ from torchvision.transforms import transforms
 import torch.optim as optim
 import torch.nn as nn
 import datetime
+import itertools
 
 
 def use_svg_display():
@@ -797,3 +798,73 @@ def predict_seq2seq(model, src_sentence, src_vocab, tgt_vocab, num_steps, device
         predicted_tokens.append(py)
     
     return ' '.join(tgt_vocab.to_token(predicted_tokens))
+
+
+
+
+##########################COMPUTER VISION####################################
+
+## Supports batching of images (batchsize, channel, height, width)
+def MultiBoxPrior(Images, sizes, ratios):
+    img_boxes = []
+    for Image in Images:
+        H,W = Image.shape[-2], Image.shape[-1]
+        step_x = 1.0/W
+        step_y = 1.0/H
+        boxes = []
+        for h,w in itertools.product(range(H), range(W)):
+            # centering in the pixel
+            cx = (w+1)*step_x
+            cy = (h+1)*step_y
+            s1 = sizes[0]
+            r1 = ratios[0]
+
+            total_width = 2.2*w*s1*math.sqrt(r1)*step_x
+            total_height = 2.25*(h*s1*step_y)/math.sqrt(r1)
+            boxes.append(
+                (cx-total_width/2.0, cy-total_height/2.0, cx+total_width/2.0, cy+total_height/2.0)
+                )
+            
+            for s, r in zip(sizes[1:],ratios[1:]):
+                ## giving the height and width some scaling to match MXNet implementation
+                total_width1 = 2.2*w*s1*math.sqrt(r)*step_x
+                total_height1 = 2.25*(h*s1*step_y)/math.sqrt(r)
+                ## giving the height and width some scaling to match MXNet implementation
+                total_width2 = 2.2*w*s*math.sqrt(r1)*step_x
+                total_height2 = 2.25*(h*s*step_y)/math.sqrt(r1)
+                boxes.extend(
+                    [(cx-total_width1/2.0, cy-total_height1/2.0, cx+total_width1/2.0, cy+total_height1/2.0),
+                    (cx-total_width2/2.0, cy-total_height2/2.0, cx+total_width2/2.0, cy+total_height2/2.0)]
+                    )
+        img_boxes.append(boxes)
+    return torch.Tensor(img_boxes)
+
+
+
+
+def bbox_to_rect(bbox, color):
+    return plt.Rectangle(
+        xy=(bbox[0], bbox[1]), width=bbox[2]-bbox[0], height=bbox[3]-bbox[1], fill=False, edgecolor=color, linewidth=2.0
+    )
+
+def show_bboxes(axes, bboxes, labels=None, colors=None):
+    def __make_list(obj, default_values=None):
+        if obj is None:
+            obj = default_values
+        elif not isinstance(obj, (list, tuple)):
+            obj = [obj]
+        
+        return obj
+    
+    labels = __make_list(labels)
+    colors = __make_list(colors, ['b','g','r','m','c'])
+
+    for i, bbox in enumerate(bboxes):
+        color = colors[i%len(colors)]
+        rect = bbox_to_rect(bbox.numpy(), color)
+        
+        axes.add_patch(rect)
+
+        if labels and len(labels)>i:
+            text_color='k' if color =='w' else 'w'
+            axes.text(rect.xy[0], rect.xy[1], labels[i], va='center', ha='center',fontsize=9, color=text_color, bbox=dict(facecolor=color, lw=0))
